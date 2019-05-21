@@ -1,0 +1,323 @@
+#!/bin/bash
+#ver: 19.2.4
+TMPDIR=
+
+function usage()
+{
+	echo
+	echo "Usage: unmunge [-o output_filename] input_filename"
+	echo " -o filename    - to specify the filename for the 'unmunged' file"
+	echo " -x             - extract to current directory"
+        echo " -v             - verbose, debug output on extraction process"
+	echo " input_filename - coroner.dat file"
+	echo " if the -o option is not specified, then the output will be coroner.user.datestr.remote.tgz"
+	echo
+}
+
+function cleanexit()
+{
+	if [ -z "${EXTRACT}" ]; then
+		if [ ! -z "${TMPDIR}" ]; then
+			if [ ! -z "${OLD_DIR}" ]; then
+				cd "${OLD_DIR}"
+			fi
+			chmod -R 777 ${TMPDIR}
+			rm -rf ${TMPDIR}
+		fi
+	fi
+        if [ $# != 0 ]; then
+		myprint "$*"
+                exit -1
+        else
+                exit 0
+        fi
+}
+
+function debug_print()
+{
+	if [ ! -z ${VERBOSE} ]; then
+                echo $*
+        fi
+}
+
+function myprint()
+{
+	if [ -z ${QUIET} ]; then
+		echo $*
+	fi
+}
+
+function find_files_without_path()
+{
+        while (( $# )); do
+                case "$1" in 
+                        */|*/*)
+                                shift
+                                continue
+                                ;;
+                        *)
+                                debug_print $1 has no path
+                                return 0
+                                ;;
+                esac
+        done
+        return 1
+}
+
+function findAndExtractTGZ()
+{
+        debug_print "Entering findAndExtractTGZ " `pwd`
+        local AllTgzFiles=`find . -iname '*.tgz' -o -iname '*.tar.gz'`
+        local TgzFileFullName="tmp"
+        for TgzFileFullName in $AllTgzFiles
+        do
+                if [ -e "$TgzFileFullName" ]; then
+                        local SaveDir=`pwd`
+                        debug_print "...Processing $TgzFileFullName"
+                        cd `dirname $TgzFileFullName`
+                        local TarFileWithoutPath=`basename $TgzFileFullName`
+                        local FilesInTar=`tar tzf $TarFileWithoutPath 2> /dev/null`
+                        local checkFile="tmp"
+                        local foundExistingFile="no"
+                        for checkFile in $FilesInTar; do
+                                if [ -e $checkFile ]; then
+                                        foundExistingFile="yes"
+                                        break
+                                fi
+                        done
+                        find_files_without_path `tar tfz $TarFileWithoutPath 2> /dev/null`
+                        PATH_MISSING=$?
+                        if [ ${PATH_MISSING} -eq 0 ]; then
+                                local PATH_MISSING=$?
+                                debug_print "Found files w/ no path"
+                        else
+                                local PATH_MISSING=$?
+                        fi
+                        debug_print PATH_MISSING=${PATH_MISSING}
+                        if [ "${foundExistingFile}" = "yes" -o  ${PATH_MISSING} -eq 0  ]; then
+                                local TarBaseName=`echo ${TarFileWithoutPath} | sed -e "s/.tgz//" -e "s/.tar.gz//"`
+                                mkdir ${TarBaseName} 2> /dev/null
+                                if [ $? -ne 0 ]; then
+                                        debug_print "Directory `pwd`/${TarBaseName} already exists, trying again with ${TarBaseName}.dir"
+                                        mkdir ${TarBaseName}.dir 2> /dev/null
+                                        if [ $? -ne 0 ]; then
+                                                debug_print "Directory `pwd`/${TarBaseName}.dir already exists, aborting."
+                                                exit 1
+                                        fi
+                                        TarBaseName=${TarBaseName}.dir
+                                fi
+                                mv ${TarFileWithoutPath} ${TarBaseName}
+                                cd ${TarBaseName}
+                        fi
+                        debug_print "... in `pwd`"
+                        if [ ! -z ${VERBOSE} ]; then
+                                tar xvkzf `basename ${TgzFileFullName}` 
+                        else
+                                tar xkzf `basename ${TgzFileFullName}` 2> /dev/null
+                        fi
+                        if [ $? -ne 0 ]; then
+                                myprint "Error during extraction of ${TgzFileFullName} in `pwd`"
+                        fi
+                        chmod -R u+w .
+                        debug_print "...extracted ${TarFileWithoutPath}"
+                        rm -f ${TarFileWithoutPath}
+                        debug_print "...deleted ${TarFileWithoutPath}"
+                        findAndExtractTGZ
+                        cd ${SaveDir}
+                fi
+        done
+}
+
+function findName(){
+cloudPaired=$(cat pref.txt | grep state | awk '{print $3'})
+if [ $cloudPaired=0 ]
+then 
+ SystemName=$(cat sysinfo.txt | grep 'info.provisioning.defSIP_displayName') 
+else
+ SystemName=$(cat sysinfo.txt | grep 'info.provisioning.defSIP_displayName')
+fi
+}
+
+function getLogDateRanges()
+{
+echo `pwd` | tee -a ../../normatum/output.txt
+gunzip *.gz 2> /dev/null
+for i in $(ls -v | grep sys); do
+  Startdate=$( awk '/ .*:/ { print $1; print $2; exit; }' $i)
+  Enddate=$(tail -1 $i | awk '/ .*:/ { print $1; print $2; exit; }')
+  tput setaf 6
+  echo $i "Date Range" | tee -a ../../normatum/output.txt  
+  tput setaf 5
+  echo  $Startdate --  $Enddate | tee -a ../../normatum/output.txt 
+
+  done
+}
+
+while getopts ":o:qxv" flag
+do
+        if [ ! -z "${OPTARG}" -a  "${OPTARG}" = ":" ]; then
+                usage
+                cleanexit
+        fi
+        case "${flag}" in
+                o)
+                        OUTPUT_FILE=${OPTARG}
+                        ;;
+                q)
+                        QUIET=true
+                        ;;
+		x)
+			EXTRACT=true
+			;;
+                v)
+                        VERBOSE=true
+                        ;;
+	esac
+done
+
+if [ "${EXTRACT}" != "true" ]; then
+        echo -- "Remember, you can use the -x option to extract the coroner to the current directory instead of converting to a tgz file."
+fi
+
+CUR_DIR=`pwd`
+
+shift $((${OPTIND} -1))
+
+if [ $# -ne 1 ]; then
+	usage
+	cleanexit "Invalid Usage"
+fi
+
+if [ ! -r "$1" ]; then
+	cleanexit "Unable to read input file $1"
+fi
+
+if [ -z "${EXTRACT}" ]; then
+	TMPDIR=`mktemp -d /tmp/unmunge.XXXXXX`
+	if [ $? != 0 ]; then
+		myprint "Could not create temporary directory."
+	fi
+else
+	TMPDIR=.
+fi
+
+OLD_DIR=`pwd`
+TMP_TGZ=`mktemp ${TMPDIR}/unmunge.XXXXXX`
+
+dd if="$1" of=${TMP_TGZ}  skip=2 &> /dev/null
+if [ $? != 0 ]; then
+	cleanexit "Error from dd conversion of file."
+fi
+
+cd ${TMPDIR}
+tar xkzf ${TMP_TGZ} &> /dev/null
+RESULT=$?
+if [ ${RESULT} != 0 ]; then
+	myprint "Possible errors extracting information from $1, continuing"
+fi
+rm -f ${TMP_TGZ}
+
+# make sure we have permission to enter all the dirs
+find . -type d -exec chmod u+x {} \;
+#rm -f tmp.tgz
+#check to see if we have any tgz files and if we do, then extract them
+#findAndExtractTGZ
+#ls *.tgz &> /dev/null && for file in *.tgz
+#do
+#        #base=`basename $file`
+#        #mkdir $base.dir
+#        tar -xzf "$file" &> /dev/null
+#        rm -f "$file"
+#done
+
+DATESTR=`date +%y%m%d-%H%M.%S`
+
+WHOAMI=`id -un`
+if [ -z "${WHOAMI}" ]; then
+	WHOAMI=unknown
+fi
+
+if [ -z "${OUTPUT_FILE}" ]; then
+	NEW_FILE="${OLD_DIR}"/coroner.${WHOAMI}.${DATESTR}.remote.tgz
+else
+	COMPARE_DIR_NAME=`dirname ${OUTPUT_FILE} | cut -c 1`
+	if [ "${COMPARE_DIR_NAME}" == '/' ]; then
+		NEW_FILE=${OUTPUT_FILE}
+	else
+		NEW_FILE="${OLD_DIR}/${OUTPUT_FILE}"
+	fi
+fi
+
+if [ -z "${EXTRACT}" ]; then
+	tar cfz "${NEW_FILE}" * 
+	if [ $? != 0 ]; then
+		cleanexit "Error creating new archive"
+	else
+		myprint "Converted coroner file stored as ${NEW_FILE}"
+	fi
+else
+	myprint "Contents extracted to current directory"
+fi
+
+if [ -f sysinfo.txt ]; then
+
+ tar -zxf data.tgz
+ tar -zxf var.tgz
+ coronerGenDate=$(cat coroner.log  | awk '/invoked/ {print $8,$9,$10}')
+ lastReboot=$(tail -6 data/reset.log)
+ SystemNameSTANDALONE=$(cat cdr.xml | grep -m1 localname | awk -F '"' '{print $26}')
+ SystemNameCLOUD=$(cat sysinfo.txt | awk '/info.provisioning.defSIP_displayName =/ {print $3, $4, $5, $6, $7}')
+ SystemName="$SystemNameSTANDALONE, $SystemNameCLOUD"
+ #findName
+ CloudExtension=$(cat sysinfo.txt | grep 'info.provisioning.defSIP_alias =' | awk '{print $3}')
+ BuildVersion=$(cat sysinfo.txt | grep 'info.system.buildversion = ' | awk '{print $3}')
+ MarketingName=$(cat sysinfo.txt | awk '/marketing/ {print $3, $4}')
+ LastUpgradePath=$(cat data/upgrade.log | tail -40 | grep 'Upgrade from')
+ LastUpgradeDate=$(cat data/upgrade.log  | tail -30 | grep "Mon\|Tue\|Wed\|Thur\|Thu\|Fri\|Sat\|Sun")
+ 
+ mkdir normatum
+
+ echo "System Name: " $SystemName | tee -a normatum/output.txt
+ echo "CloudExtension: " $CloudExtension | tee -a normatum/output.txt
+ echo "Coroner generated on: " $coronerGenDate | tee -a normatum/output.txt
+ echo "BuildVersion: " $BuildVersion | tee -a normatum/output.txt
+ tput setaf 3 #yelow
+ echo "MarketingName: " $MarketingName | tee -a normatum/output.txt
+ echo "Upgradedate: " $LastUpgradeDate | tee -a normatum/output.txt
+ echo "Upgradeimage: " $LastUpgradePath | tee -a normatum/output.txt
+ tput setaf 1 #red
+ echo "Last 6 reboots were> " | tee -a normatum/output.txt
+ echo "*******************" | tee -a normatum/output.txt
+ echo "$lastReboot" | tee -a normatum/output.txt
+
+
+ 
+ rm data.tgz
+ rm var.tgz
+
+ mkdir data/lastlog
+ mkdir data/system_error
+ tar -zxf ./data/log/lastlog.tgz -C data/lastlog/
+ tar -zxf ./data/log/system_error.tgz -C data/system_error/
+ tput setaf 2 #
+ ##echo "blip" >> normatum/output.txt
+ echo "Icon Sys.log Date Ranges> " | tee -a normatum/output.txt
+ echo "*******************"  | tee -a normatum/output.txt
+
+ cd var
+ cd log
+ getLogDateRanges
+ cd ../../
+
+ cd data/lastlog
+ tput setaf 2
+ getLogDateRanges
+ cd ../
+ 
+ cd system_error
+ tput setaf 2
+ getLogDateRanges
+ cd ../
+fi 
+tput setaf 7
+cleanexit

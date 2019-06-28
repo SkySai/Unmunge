@@ -1,5 +1,5 @@
 #!/bin/bash
-#ver: 19.2.4
+#ver: 19.6.28
 TMPDIR=
 
 function usage()

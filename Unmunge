@@ -128,15 +128,15 @@ function findAndExtractTGZ()
         done
 }
 
-function findName(){
-cloudPaired=$(cat pref.txt | grep state | awk '{print $3'})
-if [ $cloudPaired=0 ]
-then 
- SystemName=$(cat sysinfo.txt | grep 'info.provisioning.defSIP_displayName') 
-else
- SystemName=$(cat sysinfo.txt | grep 'info.provisioning.defSIP_displayName')
-fi
-}
+#function findName(){
+#cloudPaired=$(cat pref.txt | grep state | awk '{print $3'})
+#if [ $cloudPaired=0 ]
+#then 
+# SystemName=$(cat sysinfo.txt | grep 'info.provisioning.defSIP_displayName') 
+#else
+# SystemName=$(cat sysinfo.txt | grep 'info.provisioning.defSIP_displayName')
+#fi
+#}
 
 function getLogDateRanges()
 {
@@ -263,29 +263,27 @@ if [ -f sysinfo.txt ]; then
 
  tar -zxf data.tgz
  tar -zxf var.tgz
+ gunzip var/log/*.gz 2> /dev/null
  coronerGenDate=$(cat coroner.log  | awk '/invoked/ {print $8,$9,$10}')
  lastReboot=$(tail -6 data/reset.log)
  SystemNameSTANDALONE=$(cat cdr.xml | grep -m1 localname | awk -F '"' '{print $26}')
- SystemNameCLOUD=$(cat sysinfo.txt | awk '/info.provisioning.defSIP_displayName =/ {print $3, $4, $5, $6, $7}')
+ SystemNameCLOUD=$(cat var/log/sys.log.* | grep lifesize.checkin | grep extension | tail -1 | awk -F ',' '{print $8}' | awk -F ':' '{print $2}')
  SystemName="$SystemNameSTANDALONE, $SystemNameCLOUD"
- #findName
- CloudExtension=$(cat sysinfo.txt | grep 'info.provisioning.defSIP_alias =' | awk '{print $3}')
+ CloudExtension=$(cat var/log/sys.log.* | grep lifesize.checkin | grep extension | tail -1 | awk -F ',' '{print $7}' | awk -F ':' '{print $2}')
  BuildVersion=$(cat sysinfo.txt | grep 'info.system.buildversion = ' | awk '{print $3}')
  MarketingName=$(cat sysinfo.txt | awk '/marketing/ {print $3, $4}')
  LastUpgradePath=$(cat data/upgrade.log | tail -40 | grep 'Upgrade from')
  LastUpgradeDate=$(cat data/upgrade.log  | tail -30 | grep "Mon\|Tue\|Wed\|Thur\|Thu\|Fri\|Sat\|Sun")
- 
  mkdir normatum
-
  echo "System Name: " $SystemName | tee -a normatum/output.txt
  echo "CloudExtension: " $CloudExtension | tee -a normatum/output.txt
  echo "Coroner generated on: " $coronerGenDate | tee -a normatum/output.txt
  echo "BuildVersion: " $BuildVersion | tee -a normatum/output.txt
- tput setaf 3 #yelow
+ tput setaf 3 
  echo "MarketingName: " $MarketingName | tee -a normatum/output.txt
  echo "Upgradedate: " $LastUpgradeDate | tee -a normatum/output.txt
  echo "Upgradeimage: " $LastUpgradePath | tee -a normatum/output.txt
- tput setaf 1 #red
+ tput setaf 1
  echo "Last 6 reboots were> " | tee -a normatum/output.txt
  echo "*******************" | tee -a normatum/output.txt
  echo "$lastReboot" | tee -a normatum/output.txt
@@ -299,7 +297,7 @@ if [ -f sysinfo.txt ]; then
  mkdir data/system_error
  tar -zxf ./data/log/lastlog.tgz -C data/lastlog/
  tar -zxf ./data/log/system_error.tgz -C data/system_error/
- tput setaf 2 #
+ tput setaf 2
  ##echo "blip" >> normatum/output.txt
  echo "Icon Sys.log Date Ranges> " | tee -a normatum/output.txt
  echo "*******************"  | tee -a normatum/output.txt

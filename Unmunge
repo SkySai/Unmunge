@@ -142,7 +142,7 @@ function getLogDateRanges()
 {
 echo `pwd` | tee -a ../../normatum/output.txt
 gunzip *.gz 2> /dev/null
-for i in $(ls -v | grep sys | grep -v sys.log.boot| tac); do
+for i in $(ls -v | grep sys | grep -v sys.log.boot | sort -V | tac); do
   Startdate=$( awk '/ .*:/ { print $1; print $2; exit; }' $i)
   Enddate=$(tail -1 $i | awk '/ .*:/ { print $1; print $2; exit; }')
   tput setaf 6
@@ -156,27 +156,27 @@ for i in $(ls -v | grep sys | grep -v sys.log.boot| tac); do
 
 function getConfDial()
 {
-for i in $(ls -v | grep sys | grep -v sys.log.boot| tac); do
+for i in $(ls -v | grep sys | grep -v sys.log.boot | sort -V | tac); do
  cat $i | grep -i '{lsconfmand 0040:} Conf_dialCall:' >> callStartTimes0.txt
 done
 }
 
 function getHangUp()
 {
-for i in $(ls -v | grep sys | grep -v sys.log.boot | tac); do
+for i in $(ls -v | grep sys | grep -v sys.log.boot | sort -V | tac); do
  cat $i | grep -i '{lsconfmand 0040:} CallController::hangUp:' >> callEndTimes.txt
 done
 }
 
 function getTXstats()
 {
-for i in $(ls -v | grep sys | tac); do
+for i in $(ls -v | grep sys | sort -V | tac); do
  cat $i | grep -i 'TxVid' >> TXStats.txt
 done
 }
 function getRXstats()
 {
-for i in $(ls -v | grep sys | tac); do
+for i in $(ls -v | grep sys | sort -V | tac); do
  cat $i | grep -i 'RxVid' >> RXStats.txt
 done
 }

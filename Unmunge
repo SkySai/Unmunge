@@ -1,5 +1,5 @@
 #!/bin/bash
-#ver: 19.6.28
+#date: 19.10.3
 TMPDIR=
 
 function usage()
@@ -142,15 +142,43 @@ function getLogDateRanges()
 {
 echo `pwd` | tee -a ../../normatum/output.txt
 gunzip *.gz 2> /dev/null
-for i in $(ls -v | grep sys); do
+for i in $(ls -v | grep sys | grep -v sys.log.boot| tac); do
   Startdate=$( awk '/ .*:/ { print $1; print $2; exit; }' $i)
   Enddate=$(tail -1 $i | awk '/ .*:/ { print $1; print $2; exit; }')
   tput setaf 6
-  echo $i "Date Range" | tee -a ../../normatum/output.txt  
+  #echo $i "Date Range" | tee -a ../../normatum/output.txt  
   tput setaf 5
-  echo  $Startdate --  $Enddate | tee -a ../../normatum/output.txt 
+  echo  $Startdate --  $Enddate "    " $i | tee -a ../../normatum/output.txt 
 
   done
+}
+
+
+function getConfDial()
+{
+for i in $(ls -v | grep sys | grep -v sys.log.boot| tac); do
+ cat $i | grep -i '{lsconfmand 0040:} Conf_dialCall:' >> callStartTimes0.txt
+done
+}
+
+function getHangUp()
+{
+for i in $(ls -v | grep sys | grep -v sys.log.boot | tac); do
+ cat $i | grep -i '{lsconfmand 0040:} CallController::hangUp:' >> callEndTimes.txt
+done
+}
+
+function getTXstats()
+{
+for i in $(ls -v | grep sys | tac); do
+ cat $i | grep -i 'TxVid' >> TXStats.txt
+done
+}
+function getRXstats()
+{
+for i in $(ls -v | grep sys | tac); do
+ cat $i | grep -i 'RxVid' >> RXStats.txt
+done
 }
 
 while getopts ":o:qxv" flag
@@ -267,9 +295,9 @@ if [ -f sysinfo.txt ]; then
  coronerGenDate=$(cat coroner.log  | awk '/invoked/ {print $8,$9,$10}')
  lastReboot=$(tail -6 data/reset.log)
  SystemNameSTANDALONE=$(cat cdr.xml | grep -m1 localname | awk -F '"' '{print $26}')
- SystemNameCLOUD=$(cat var/log/sys.log.* | grep lifesize.checkin | grep extension | tail -1 | awk -F ',' '{print $8}' | awk -F ':' '{print $2}')
+ SystemNameCLOUD=$(cat var/log/sys.log* | grep lifesize.checkin | grep extension | tail -1 | awk -F ',' '{print $8}' | awk -F ':' '{print $2}')
  SystemName="$SystemNameSTANDALONE, $SystemNameCLOUD"
- CloudExtension=$(cat var/log/sys.log.* | grep lifesize.checkin | grep extension | tail -1 | awk -F ',' '{print $7}' | awk -F ':' '{print $2}')
+ CloudExtension=$(cat var/log/sys.log* | grep lifesize.checkin | grep extension | tail -1 | awk -F ',' '{print $7}' | awk -F ':' '{print $2}')
  BuildVersion=$(cat sysinfo.txt | grep 'info.system.buildversion = ' | awk '{print $3}')
  MarketingName=$(cat sysinfo.txt | awk '/marketing/ {print $3, $4}')
  LastUpgradePath=$(cat data/upgrade.log | tail -40 | grep 'Upgrade from')
@@ -305,16 +333,43 @@ if [ -f sysinfo.txt ]; then
  cd var
  cd log
  getLogDateRanges
+ getRXstats
+ getTXstats
+ getConfDial
+ awk '!seen[$0]++' callStartTimes0.txt > callStartTimes.txt
+ rm callStartTimes0.txt
+ getHangUp
+ sort callStartTimes.txt callEndTimes.txt > callStartEndTimes.txt
+ mkdir SUPPORT
+ mv callStartTimes.txt callEndTimes.txt CallStartEndTimes.txt RXStats.txt TXStats.txt SUPPORT
  cd ../../
 
  cd data/lastlog
  tput setaf 2
  getLogDateRanges
+ getRXstats
+ getTXstats
+ getConfDial
+ awk '!seen[$0]++' callStartTimes0.txt > callStartTimes.txt
+ rm callStartTimes0.txt
+ getHangUp
+ sort callStartTimes.txt callEndTimes.txt > callStartEndTimes.txt
+ mkdir SUPPORT
+ mv callStartTimes.txt callEndTimes.txt CallStartEndTimes.txt RXStats.txt TXStats.txt SUPPORT
  cd ../
  
  cd system_error
  tput setaf 2
  getLogDateRanges
+ getRXstats
+ getTXstats
+ getConfDial
+ awk '!seen[$0]++' callStartTimes0.txt > callStartTimes.txt
+ rm callStartTimes0.txt
+ getHangUp
+ sort callStartTimes.txt callEndTimes.txt > callStartEndTimes.txt
+ mkdir SUPPORT
+ mv callStartTimes.txt callEndTimes.txt CallStartEndTimes.txt RXStats.txt TXStats.txt SUPPORT
  cd ../
 fi 
 tput setaf 7

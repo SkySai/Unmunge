@@ -128,15 +128,6 @@ function findAndExtractTGZ()
         done
 }
 
-#function findName(){
-#cloudPaired=$(cat pref.txt | grep state | awk '{print $3'})
-#if [ $cloudPaired=0 ]
-#then 
-# SystemName=$(cat sysinfo.txt | grep 'info.provisioning.defSIP_displayName') 
-#else
-# SystemName=$(cat sysinfo.txt | grep 'info.provisioning.defSIP_displayName')
-#fi
-#}
 
 function getLogDateRanges()
 {
@@ -171,13 +162,13 @@ done
 function getTXstats()
 {
 for i in $(ls -v | grep sys | sort -V | tac); do
- cat $i | grep -i 'TxVid' >> TXStats.txt
+ cat $i | grep -i 'TxVid' | grep -v -i connected | grep -v void >> TXStats.txt
 done
 }
 function getRXstats()
 {
 for i in $(ls -v | grep sys | sort -V | tac); do
- cat $i | grep -i 'RxVid' >> RXStats.txt
+ cat $i | grep -i 'RxVid' | grep -v -i connected | grep -v void >> RXStats.txt
 done
 }
 

@@ -151,6 +151,13 @@ for i in $(ls -v | grep sys | grep -v sys.log.boot | sort -V | tac); do
  cat $i | grep -i '{lsconfmand 0040:} Conf_dialCall:' >> callStartTimes0.txt
 done
 }
+#lsconfmand: {lsconfmand 0040:} CallController::answer: answered a dialed call
+function getAnsweredcall()
+{
+for i in $(ls -v | grep sys | grep -v sys.log.boot | sort -V | tac); do
+ cat $i | grep -i 'lsconfmand: {lsconfmand 0040:} CallController::answer: answered a dialed call' >> callAnsweredTimes.txt
+done
+}
 
 function getHangUp()
 {
@@ -161,15 +168,23 @@ done
 
 function getTXstats()
 {
-for i in $(ls -v | grep sys | sort -V | tac); do
+for i in $(ls -v | grep sys | grep -v sys.log.boot | sort -V | tac); do
  cat $i | grep -i 'TxVid' | grep -v -i connected | grep -v void >> TXStats.txt
 done
+cat TXStats.txt | awk '{print $1" "$2}' > ExcelDates.txt
+cat TXStats.txt | awk '{print $12}' | awk -F '=' '{print $2}' > ExcelTxBitRate.txt
+cat TXStats.txt | awk '{print $16}' | awk -F '=' '{print $2}' > ExcelTxPacketLoss.txt
+cat TXStats.txt | awk '{print $15}' | awk -F '=' '{print $2}' > ExcelTxJitter.txt
 }
 function getRXstats()
 {
-for i in $(ls -v | grep sys | sort -V | tac); do
+for i in $(ls -v | grep sys | grep -v sys.log.boot | sort -V | tac); do
  cat $i | grep -i 'RxVid' | grep -v -i connected | grep -v void >> RXStats.txt
 done
+cat RXStats.txt | awk '{print $1" "$2}' > ExcelDates.txt
+cat RXStats.txt | awk '{print $12}' | awk -F '=' '{print $2}' > ExcelRxBitRate.txt
+cat RXStats.txt | awk '{print $16}' | awk -F '=' '{print $2}' > ExcelRxPacketLoss.txt
+cat RXStats.txt | awk '{print $15}' | awk -F '=' '{print $2}' > ExcelRxJitter.txt
 }
 
 while getopts ":o:qxv" flag
@@ -329,9 +344,12 @@ if [ -f sysinfo.txt ]; then
  getConfDial
  awk '!seen[$0]++' callStartTimes0.txt > callStartTimes.txt
  rm callStartTimes0.txt
+ getAnsweredcall
  getHangUp
- sort callStartTimes.txt callEndTimes.txt > callStartEndTimes.txt
+ sort callAnsweredTimes.txt callStartTimes.txt callEndTimes.txt > callStartEndTimes.txt
  mkdir SUPPORT
+ mkdir SUPPORT/ExcelFolder
+ mv Excel* SUPPORT/ExcelFolder
  mv callStartTimes.txt callEndTimes.txt CallStartEndTimes.txt RXStats.txt TXStats.txt SUPPORT
  cd ../../
 
@@ -343,9 +361,12 @@ if [ -f sysinfo.txt ]; then
  getConfDial
  awk '!seen[$0]++' callStartTimes0.txt > callStartTimes.txt
  rm callStartTimes0.txt
+ getAnsweredcall
  getHangUp
- sort callStartTimes.txt callEndTimes.txt > callStartEndTimes.txt
+ sort callAnsweredTimes.txt callStartTimes.txt callEndTimes.txt > callStartEndTimes.txt
  mkdir SUPPORT
+ mkdir SUPPORT/ExcelFolder
+ mv Excel* SUPPORT/ExcelFolder
  mv callStartTimes.txt callEndTimes.txt CallStartEndTimes.txt RXStats.txt TXStats.txt SUPPORT
  cd ../
  
@@ -357,10 +378,13 @@ if [ -f sysinfo.txt ]; then
  getConfDial
  awk '!seen[$0]++' callStartTimes0.txt > callStartTimes.txt
  rm callStartTimes0.txt
+ getAnsweredcall
  getHangUp
- sort callStartTimes.txt callEndTimes.txt > callStartEndTimes.txt
+ sort callAnsweredTimes.txt callStartTimes.txt callEndTimes.txt > callStartEndTimes.txt
  mkdir SUPPORT
- mv callStartTimes.txt callEndTimes.txt CallStartEndTimes.txt RXStats.txt TXStats.txt SUPPORT
+ mkdir SUPPORT/ExcelFolder
+ mv Excel* SUPPORT/ExcelFolder
+ mv callStartTimes.txt callEndTimes.txt CallStartEndTimes.txt RXStats.txt TXStats.txt SUPPORT 
  cd ../
 fi 
 tput setaf 7
